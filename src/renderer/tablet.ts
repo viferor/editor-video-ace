@@ -7,7 +7,7 @@ import { store } from './store';
 import { parseFit, parseGpx } from './telemetry';
 import { TimelinePlayer } from './player';
 import { paintOverlay } from './overlayView';
-import { builtinTemplates, cloneWidgets } from './overlay';
+import { openDataEditor, dataEditing } from './tabletData';
 import { openHighlightsDialog } from './highlightsDialog';
 import { openMusicDialog } from './musicDialog';
 import { openTransitionsDialog, TRANSITIONS } from './transitionsDialog';
@@ -127,7 +127,8 @@ async function applyRemote(s: TabletState) {
     store.encoders = s.encoders;
     // solo se toca lo que ha cambiado (así no se pierde el deshacer de la tablet con el "eco" del PC)
     if (!same(store.timeline, s.timeline)) { store.timeline = s.timeline; store.resetTimelineHistory(); }
-    if (!same(store.overlay, s.overlay)) store.overlay = s.overlay;
+    // mientras se arrastra un dato en el editor de datos, no se pisa
+    if (!dataEditing.dragging && !same(store.overlay, s.overlay)) store.overlay = s.overlay;
     store.overlayEnabled = s.overlayEnabled;
     if (!same(store.songs, s.songs)) store.songs = s.songs;
     store.musicSettings = s.musicSettings;
@@ -397,27 +398,7 @@ $('#t-hl').onclick = () => { player.pause(); openHighlightsDialog(); };
 $('#t-mus').onclick = () => { player.pause(); openMusicDialog(); };
 $('#t-tr').onclick = () => { player.pause(); openTransitionsDialog(); };
 
-$('#t-data').onclick = () => {
-  const dlg = h('div', { class: 'modal-back' });
-  dlg.innerHTML = `
-  <div class="modal">
-    <h2>📊 Datos sobre el vídeo</h2>
-    <label class="check big-check"><input type="checkbox" id="d-on"> Mostrar y grabar los datos</label>
-    <p class="muted small">Elige una plantilla. Para mover o cambiar cada dato por separado, usa la pestaña Datos del PC.</p>
-    <div class="tpl-grid" id="d-tpls"></div>
-    <div class="modal-actions"><button id="d-ok" class="primary">Listo</button></div>
-  </div>`;
-  document.body.append(dlg);
-  const on = $<HTMLInputElement>('#d-on', dlg);
-  on.checked = store.overlayEnabled;
-  on.onchange = () => { store.overlayEnabled = on.checked; store.emit('overlay'); };
-  for (const t of builtinTemplates()) {
-    const b = h('button', { class: 'tpl-btn' }, t.name);
-    b.onclick = () => { store.overlay = cloneWidgets(t.widgets); store.overlayEnabled = true; on.checked = true; store.emit('overlay'); toast(`Plantilla «${t.name}»`, 'ok', 1500); };
-    $('#d-tpls', dlg).append(b);
-  }
-  $('#d-ok', dlg).onclick = () => dlg.remove();
-};
+$('#t-data').onclick = () => { player.pause(); openDataEditor(() => paint()); };
 
 // ------------------------------------------------------------ proyecto y archivos (los hace el PC)
 /** Ejecuta una orden en el PC y espera a que llegue el estado nuevo. */
@@ -442,12 +423,42 @@ const askName = (title: string, def: string) => {
 };
 const today = () => new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 
+/** Carga una actividad del PC (y espera a tenerla aquí también para el mapa y los datos). */
+async function loadActivity(path: string) {
+  const r = await run<{ name: string; km: string; sync: string }>({ cmd: 'loadTelemetry', path });
+  if (!r) return false;
+  for (let i = 0; i < 20 && !store.telemetry; i++) await new Promise((res) => setTimeout(res, 250));
+  toast(`🗺 ${r.name} · ${r.km} km${r.sync ? ' · ' + r.sync : ''}`, 'ok', 7000);
+  return true;
+}
+
+/** Elegir entre varias actividades (FIT/GPX) encontradas en la carpeta. */
+function chooseActivity(paths: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    const dlg = h('div', { class: 'modal-back' });
+    dlg.innerHTML = `<div class="modal"><h2>🗺 ¿Cuál es la actividad de esta salida?</h2>
+      <p class="muted small">En la carpeta hay ${paths.length} actividades.</p><div class="pm-list"></div>
+      <div class="modal-actions"><span class="spacer"></span><button id="ca-none">Ninguna</button></div></div>`;
+    const box = $('.pm-list', dlg);
+    for (const p of paths) {
+      const b = h('button', { class: 'pm-row' }, h('b', {}, basename(p)), h('small', { class: 'muted' }, dirOf(p)));
+      b.onclick = () => { dlg.remove(); resolve(p); };
+      box.append(b);
+    }
+    $('#ca-none', dlg).onclick = () => { dlg.remove(); resolve(null); };
+    document.body.append(dlg);
+  });
+}
+
+const cameraFolder = (n: string) => /^(camera\d*|dcim|\d+[a-z]*|[a-z]:\\?|)$/i.test(n);
+
 function openProjectMenu() {
   player.pause();
   const dlg = h('div', { class: 'modal-back' });
   const render = () => {
+    const recents = (remote?.recents ?? []).filter((p) => p.toLowerCase() !== (remote?.projectPath ?? '').toLowerCase()).slice(0, 6);
     dlg.innerHTML = `
-    <div class="modal">
+    <div class="modal wide">
       <h2>📁 Proyecto</h2>
       <div class="pm-card">
         <div class="pm-name">${name || '—'}</div>
@@ -455,10 +466,16 @@ function openProjectMenu() {
         <div class="small">${store.clips.length} vídeos · ${store.timeline.length} momentos · ${fmtTime(store.timelineDuration())}</div>
       </div>
       <div class="pm-grid">
-        <button id="pm-new">＋ Nuevo proyecto</button>
-        <button id="pm-open">📂 Abrir proyecto</button>
+        <button id="pm-open">📂 Abrir otro proyecto…</button>
         <button id="pm-ren">✎ Guardar con otro nombre</button>
       </div>
+      <h3>＋ Proyecto nuevo</h3>
+      <div class="pm-new">
+        <button id="pm-folder" class="pm-big"><span>📁</span><b>Desde una carpeta del PC</b><small>Todos sus vídeos y, si lo hay, el FIT/GPX (p. ej. la tarjeta)</small></button>
+        <button id="pm-vids" class="pm-big"><span>🎞</span><b>Elegir vídeos</b><small>Del PC o subidos desde la tablet</small></button>
+        <button id="pm-new" class="pm-big"><span>＋</span><b>Vacío</b><small>Añades los vídeos después</small></button>
+      </div>
+      ${recents.length ? '<h3>🕘 Recientes</h3><div class="pm-list" id="pm-rec"></div>' : ''}
       <h3>🗺 Actividad (FIT / GPX)</h3>
       <div class="pm-card small">${store.telemetry ? `<b>${store.telemetry.name}</b> · ${((store.telemetry.points[store.telemetry.points.length - 1].dist ?? 0) / 1000).toFixed(1)} km` : '<span class="muted">Sin actividad: los datos y el mapa no se pueden mostrar.</span>'}</div>
       <div class="pm-grid"><button id="pm-tel">${store.telemetry ? '↻ Cambiar actividad' : '＋ Cargar actividad'}</button></div>
@@ -466,18 +483,58 @@ function openProjectMenu() {
       <div class="modal-actions"><span class="spacer"></span><button id="pm-ok" class="primary">Listo</button></div>
     </div>`;
     $('#pm-ok', dlg).onclick = () => dlg.remove();
+    const rec = dlg.querySelector('#pm-rec');
+    for (const p of recents) {
+      const b = h('button', { class: 'pm-row' }, h('b', {}, basename(p).replace(/\.evproj$/i, '')), h('small', { class: 'muted' }, dirOf(p)));
+      b.onclick = () => openProj(p);
+      rec?.append(b);
+    }
+    const openProj = async (p: string) => {
+      const t = toast('Abriendo en el PC…', 'info', 600000);
+      const ok = await run({ cmd: 'openProject', path: p });
+      t.remove();
+      if (ok) { toast(`Proyecto abierto: ${basename(p).replace(/\.evproj$/i, '')}`, 'ok', 2500); dlg.remove(); }
+    };
     $('#pm-new', dlg).onclick = async () => {
       const n = askName('Nombre del proyecto nuevo:', `Ruta ${today()}`);
       if (!n) return;
       if (await run({ cmd: 'newProject', name: n })) { toast(`Proyecto «${n}» creado. Ahora añade los vídeos.`, 'ok', 4000); dlg.remove(); openClips(); }
     };
+    /** Crea el proyecto en el PC desde una carpeta o unos vídeos. */
+    const newFrom = async (src: { folder?: string; videos?: string[] }, suggested: string) => {
+      const n = window.prompt('Nombre del proyecto (si lo dejas vacío: «Ruta» y la fecha de la grabación):', suggested);
+      if (n === null) return;
+      const t = toast(src.folder ? 'Creando el proyecto con los vídeos de la carpeta…' : 'Creando el proyecto…', 'info', 600000);
+      const r = await run<{ path: string; clips: number; activity: string | null; activities: string[] }>({ cmd: 'newFrom', name: n.trim() || null, ...src });
+      t.remove();
+      if (!r) return;
+      let act = r.activity;
+      if (!act && r.activities.length) {
+        const pick = await chooseActivity(r.activities);
+        if (pick && (await loadActivity(pick))) act = pick;
+      }
+      for (let i = 0; i < 20 && act && !store.telemetry; i++) await new Promise((res) => setTimeout(res, 250));
+      const pname = basename(r.path).replace(/\.evproj$/i, '');
+      toast(`Proyecto «${pname}» creado: ${r.clips} vídeo${r.clips === 1 ? '' : 's'}${act ? ' · actividad ' + basename(act) : ''}`, 'ok', 6000);
+      if (!act) {
+        toast('No se encontró la actividad: cárgala con «＋ Cargar actividad».', 'info', 7000);
+        render();
+      } else dlg.remove();
+    };
+    $('#pm-folder', dlg).onclick = async () => {
+      const p = await pickFiles({ kind: 'video', folder: true, title: '📁 Elige la carpeta de la salida', extraRoots: clipRoots() });
+      if (!p) return;
+      const folderName = basename(p[0]);
+      await newFrom({ folder: p[0] }, cameraFolder(folderName) ? '' : folderName);
+    };
+    $('#pm-vids', dlg).onclick = async () => {
+      const p = await pickFiles({ kind: 'video', multi: true, title: '🎞 Vídeos del proyecto nuevo', extraRoots: clipRoots() });
+      if (!p?.length) return;
+      await newFrom({ videos: p }, '');
+    };
     $('#pm-open', dlg).onclick = async () => {
       const p = await pickFiles({ kind: 'project', title: '📂 Abrir proyecto' });
-      if (!p) return;
-      const t = toast('Abriendo en el PC…', 'info', 600000);
-      const ok = await run({ cmd: 'openProject', path: p[0] });
-      t.remove();
-      if (ok) { toast('Proyecto abierto', 'ok', 2000); dlg.remove(); }
+      if (p) await openProj(p[0]);
     };
     $('#pm-ren', dlg).onclick = async () => {
       const n = askName('Nombre del proyecto:', name);
@@ -485,14 +542,7 @@ function openProjectMenu() {
     };
     $('#pm-tel', dlg).onclick = async () => {
       const p = await pickFiles({ kind: 'telemetry', title: '🗺 Elegir la actividad (FIT o GPX)', extraRoots: clipRoots() });
-      if (!p) return;
-      const r = await run<{ name: string; km: string; sync: string }>({ cmd: 'loadTelemetry', path: p[0] });
-      if (r) {
-        // la actividad se lee aquí también (para el mapa y los datos)
-        for (let i = 0; i < 20 && !store.telemetry; i++) await new Promise((res) => setTimeout(res, 250));
-        toast(`🗺 ${r.name} · ${r.km} km${r.sync ? ' · ' + r.sync : ''}`, 'ok', 7000);
-        render();
-      }
+      if (p && (await loadActivity(p[0]))) render();
     };
   };
   render();

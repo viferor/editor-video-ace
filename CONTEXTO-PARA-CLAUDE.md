@@ -57,6 +57,7 @@ src/renderer/overlay*.ts   widgets de datos (número, indicador, barra, gráfica
 src/renderer/highlights*.ts highlights automáticos (+ ajuste a la música)
 src/renderer/projectDialog.ts ventanas «Proyecto nuevo» y «Abrir» (vídeos / carpeta / vacío / proyecto / recientes)
 src/renderer/musicDialog.ts, transitionsDialog.ts, exportDialog.ts, player.ts, telemetry.ts, util.ts, types.ts
+src/renderer/tabletData.ts editor de datos de la tablet (pantalla completa: tocar/arrastrar/esquina/pellizco, chips, deshacer)
 src/renderer/tablet.ts/.html/.css, tabletApi.ts (window.api por HTTP), tabletFiles.ts (explorador y subidas),
                            tabletLink.ts (lado PC: estado, órdenes, ofertas de archivos, diálogo con QR)
 ```
@@ -86,6 +87,10 @@ src/renderer/tablet.ts/.html/.css, tabletApi.ts (window.api por HTTP), tabletFil
   Autoguardado una vez con nombre, recuperación de sesión, reabre el último, reenlaza archivos movidos.
 - **Tablet** (Chrome en la misma wifi, `http://<ip-del-PC>:8765/?k=<clave>`):
   - La clave y el puerto se guardan (la dirección no cambia); opción «compartir siempre al abrir el editor»; «🔑 Cambiar la clave».
+  - 📁 Proyecto: abrir, recientes (los manda el PC en `recents`), guardar con otro nombre y proyecto nuevo «Desde una carpeta del PC»
+    (orden `newFrom`: explorador en modo carpeta, `scanMedia`, carga el FIT/GPX si hay uno; con varios, la tablet pregunta),
+    «Elegir vídeos» o «Vacío». 📊 Datos abre el editor dato a dato (mientras se arrastra, `dataEditing.dragging` evita que el
+    estado del PC lo pise). Probado con Electron, incluido el pellizco con eventos táctiles de CDP.
   - Botones: 📁 Proyecto (nuevo/abrir/renombrar, cargar FIT), 🎞 Clips (añadir de carpetas del PC o subir desde la tablet, al
     montaje, quitar), 🗺 Sincro (la misma vista que el PC), ⇅ Archivos (bajar cualquier archivo del PC / subir a la carpeta del PC
     abierta), ✨ Highlights, 🎵 Música, ⧉ Transic., 📊 Datos (plantillas), ⇪ Exportar (en el PC), ⛶ pantalla completa (recordada)
@@ -112,5 +117,6 @@ src/renderer/tablet.ts/.html/.css, tabletApi.ts (window.api por HTTP), tabletFil
 - Tocar el mapa con el dedo en la tablet no se pudo probar automáticamente (es el mismo código que en el PC).
 - «📤 Enviar archivos a la tablet…» no probado (abre el diálogo de Windows); usa el mismo aviso que el vídeo exportado (sí probado).
 - Probar la tablet con la versión instalada (`CrearInstalador.bat`).
-- Próximas ideas: editor de datos widget a widget en la tablet (ahora solo plantillas).
+- Próximas ideas: plantillas propias desde la tablet (ahora solo las incluidas; las propias viven en el localStorage del PC);
+  retocar la línea de tiempo con el dedo.
 - Recomendado al usuario: reservar la IP del PC en el router para que la dirección de la tablet no cambie nunca.

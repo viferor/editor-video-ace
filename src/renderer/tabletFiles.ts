@@ -54,8 +54,9 @@ function upload(file: File, kind: FileKind, onPct: (f: number) => void, dir = ''
  * Explorador de archivos. Devuelve las rutas elegidas (en el PC) o null si se cancela.
  * extraRoots: accesos rápidos añadidos arriba (p. ej. la carpeta de los clips del proyecto).
  */
-export function pickFiles(opts: { kind: FileKind; title: string; multi?: boolean; extraRoots?: { name: string; path: string }[]; footer?: HTMLElement }): Promise<string[] | null> {
-  const { kind, multi = false } = opts;
+export function pickFiles(opts: { kind: FileKind; title: string; multi?: boolean; folder?: boolean; extraRoots?: { name: string; path: string }[]; footer?: HTMLElement }): Promise<string[] | null> {
+  const { kind, folder = false } = opts;
+  const multi = !folder && !!opts.multi;
   return new Promise((resolve) => {
     const dlg = h('div', { class: 'modal-back' });
     dlg.innerHTML = `
@@ -70,21 +71,30 @@ export function pickFiles(opts: { kind: FileKind; title: string; multi?: boolean
       <div id="fp-foot"></div>
       <div class="fp-upl" id="fp-upl" hidden></div>
       <div class="modal-actions">
-        <label class="t-upload-btn"><input type="file" id="fp-file" accept="${ACCEPT[kind]}" ${multi ? 'multiple' : ''} hidden>⬆ Subir desde la tablet</label>
+        ${folder ? '' : `<label class="t-upload-btn"><input type="file" id="fp-file" accept="${ACCEPT[kind]}" ${multi ? 'multiple' : ''} hidden>⬆ Subir desde la tablet</label>`}
         <button id="fp-all" class="chip" ${multi ? '' : 'hidden'}>Marcar todos</button>
         <span class="spacer"></span>
         <button id="fp-cancel">Cancelar</button>
-        <button id="fp-ok" class="primary" ${multi ? '' : 'hidden'} disabled>Añadir</button>
+        <button id="fp-ok" class="primary" ${multi || folder ? '' : 'hidden'} disabled>${folder ? '✓ Usar esta carpeta' : 'Añadir'}</button>
       </div>
     </div>`;
     document.body.append(dlg);
     if (opts.footer) $('#fp-foot', dlg).append(opts.footer);
+    if (folder) $('#fp-foot', dlg).append(h('p', { class: 'muted small' }, 'Entra en la carpeta y pulsa «✓ Usar esta carpeta». También se cogen los vídeos de sus subcarpetas (p. ej. DCIM\\Camera01) y el FIT/GPX que haya.'));
     const chosen = new Set<string>();
     let cur: Listing | null = null;
     let uploading = false;
     const done = (r: string[] | null) => { if (uploading && r === null) return; dlg.remove(); resolve(r); };
     const okBtn = $<HTMLButtonElement>('#fp-ok', dlg);
-    const updateOk = () => { okBtn.disabled = !chosen.size; okBtn.textContent = chosen.size ? `Añadir ${chosen.size}` : 'Añadir'; };
+    const updateOk = () => {
+      if (folder) {
+        const n = cur?.entries.filter((e) => e.type === 'file').length ?? 0;
+        okBtn.disabled = !cur?.dir;
+        okBtn.textContent = cur?.dir ? `✓ Usar esta carpeta${n ? ` (${n} vídeo${n === 1 ? '' : 's'} aquí)` : ''}` : '✓ Usar esta carpeta';
+        return;
+      }
+      okBtn.disabled = !chosen.size; okBtn.textContent = chosen.size ? `Añadir ${chosen.size}` : 'Añadir';
+    };
 
     const open = async (dir: string) => {
       const box = $('#fp-list', dlg);
@@ -111,6 +121,7 @@ export function pickFiles(opts: { kind: FileKind; title: string; multi?: boolean
           e.type === 'file' ? h('span', { class: 'fp-meta muted' }, `${fmtDate(e.mtime)} · ${mb(e.size)}`) : null);
         row.onclick = () => {
           if (e.type === 'dir') return open(e.path);
+          if (folder) return;
           if (!multi) return done([e.path]);
           if (chosen.has(e.path)) chosen.delete(e.path); else chosen.add(e.path);
           row.classList.toggle('on');
@@ -119,6 +130,7 @@ export function pickFiles(opts: { kind: FileKind; title: string; multi?: boolean
         };
         box.append(row);
       }
+      if (folder) updateOk();
       $<HTMLButtonElement>('#fp-all', dlg).hidden = !multi || !files.length;
       $('#fp-all', dlg).onclick = () => {
         const all = files.every((f) => chosen.has(f.path));
@@ -131,11 +143,11 @@ export function pickFiles(opts: { kind: FileKind; title: string; multi?: boolean
     $('#fp-up', dlg).onclick = () => cur && cur.parent != null && open(cur.parent);
     $('#fp-root', dlg).onclick = () => open('');
     $('#fp-cancel', dlg).onclick = () => done(null);
-    okBtn.onclick = () => done([...chosen]);
+    okBtn.onclick = () => done(folder ? (cur?.dir ? [cur.dir] : null) : [...chosen]);
 
     // subir desde la tablet: se guardan en el PC (Vídeos\Editor Video Ace\Desde la tablet) y se usan esas copias
     const input = $<HTMLInputElement>('#fp-file', dlg);
-    input.onchange = async () => {
+    if (input) input.onchange = async () => {
       const fs = [...(input.files || [])];
       if (!fs.length) return;
       uploading = true;

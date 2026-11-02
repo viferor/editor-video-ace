@@ -14,28 +14,51 @@ let deps: ProjectDialogDeps;
 export function initProjectDialog(d: ProjectDialogDeps) { deps = d; }
 
 const today = () => new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
-const dirOf = (p: string) => p.replace(/[\\/][^\\/]*$/, '');
+export const dirOf = (p: string) => p.replace(/[\\/][^\\/]*$/, '');
 
 function close() { document.querySelector('.modal-back.pd')?.remove(); }
 
-/** Crea el proyecto con esos vídeos (y la actividad, si se encuentra) y lo guarda ya con nombre. */
+/** Nombre por defecto: «Ruta» y la fecha de la grabación (o la de hoy). */
+function defaultName() {
+  const t = store.clips.find((c) => c.cameraStamp != null)?.cameraStamp;
+  const d = t != null ? new Date(t).toLocaleDateString('es-ES', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : today();
+  return `Ruta ${d}`;
+}
+
+/** Nombre de carpeta útil como nombre de proyecto (las de la cámara, no). */
+export function folderProjectName(dir: string): string | null {
+  const n = basename(dir);
+  return /^(camera\d*|dcim|\d+[a-z]*|[a-z]:\\?|)$/i.test(n) ? null : n;
+}
+
+/**
+ * Núcleo (PC y tablet): vacía, añade los vídeos y guarda ya con nombre en Documentos\Editor Video Ace.
+ * No pregunta nada ni carga la actividad.
+ */
+export async function buildProject(o: { name: string | null; videos: string[] }): Promise<string> {
+  store.reset();
+  if (o.videos.length) await store.addClips(o.videos);
+  const p = await window.api.projectPathFor(o.name?.trim() || defaultName());
+  await store.saveTo(p, false);
+  return p;
+}
+
+/** Vídeos y actividades de una carpeta, o los FIT/GPX que haya junto a unos vídeos elegidos. */
+export async function mediaFor(o: { folder?: string; videos?: string[] }): Promise<{ videos: string[]; activities: string[] }> {
+  if (o.folder) return window.api.scanMedia(o.folder);
+  const v = o.videos ?? [];
+  if (!v.length) return { videos: [], activities: [] };
+  const d = dirOf(v[0]).toLowerCase();
+  const { activities } = await window.api.scanMedia(dirOf(v[0]));
+  return { videos: v, activities: activities.filter((a) => dirOf(a).toLowerCase() === d) };
+}
+
+/** PC: crea el proyecto (preguntando antes por el actual y, si hay varias, por la actividad). */
 async function createFrom(o: { name: string | null; videos: string[]; activities?: string[]; folder?: string }) {
   if (!(await deps.confirmDiscard())) return false;
   close();
-  store.reset();
-  if (o.videos.length) {
-    toast(`Abriendo ${o.videos.length} vídeo${o.videos.length === 1 ? '' : 's'}…`, 'info', 2500);
-    await store.addClips(o.videos);
-  }
-  // nombre: el escrito o, si no, la fecha de la grabación
-  let name = o.name?.trim() || '';
-  if (!name) {
-    const t = store.clips.find((c) => c.cameraStamp != null)?.cameraStamp;
-    const d = t != null ? new Date(t).toLocaleDateString('es-ES', { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-') : today();
-    name = `Ruta ${d}`;
-  }
-  const p = await window.api.projectPathFor(name);
-  await store.saveTo(p, false);
+  if (o.videos.length) toast(`Abriendo ${o.videos.length} vídeo${o.videos.length === 1 ? '' : 's'}…`, 'info', 2500);
+  const p = await buildProject({ name: o.name, videos: o.videos });
   // actividad de la carpeta
   const acts = o.activities ?? [];
   let act: string | null = null;
@@ -61,9 +84,8 @@ async function createFrom(o: { name: string | null; videos: string[]; activities
 async function pickVideos(name: string | null) {
   const v = await window.api.openVideos();
   if (!v.length) return;
-  // si hay un FIT/GPX junto a los vídeos, se ofrece
-  const { activities } = await window.api.scanMedia(dirOf(v[0]));
-  await createFrom({ name, videos: v, activities: activities.filter((a) => dirOf(a).toLowerCase() === dirOf(v[0]).toLowerCase()) });
+  // si hay un FIT/GPX junto a los vídeos, se usa
+  await createFrom({ name, ...(await mediaFor({ videos: v })) });
 }
 
 async function pickFolder(name: string | null) {
@@ -74,10 +96,7 @@ async function pickFolder(name: string | null) {
     toast(`No hay vídeos MP4/MOV en «${basename(dir)}» ni en sus subcarpetas.`, 'error', 6000);
     return;
   }
-  const folderName = basename(dir);
-  // nombres de carpeta de la cámara no sirven como nombre del proyecto
-  const useFolder = !name && !/^(camera\d*|dcim|\d+[a-z]*|[a-z]:)$/i.test(folderName);
-  await createFrom({ name: name || (useFolder ? folderName : null), videos, activities, folder: dir });
+  await createFrom({ name: name || folderProjectName(dir), videos, activities, folder: dir });
 }
 
 function sourceButtons() {

@@ -156,6 +156,8 @@ export interface TabletState {
   syncLocked: boolean;
   mapSynced?: boolean;
   offers: FileOffer[];
+  /** Proyectos recientes del PC (los que existen). */
+  recents?: string[];
   syncSource?: string;
 }
 
@@ -165,6 +167,8 @@ export interface FileOffer { id?: string; path: string; name: string; size: numb
 /** Órdenes de la tablet que solo puede hacer el PC (archivos y proyecto). */
 export type TabletCommand =
   | { cmd: 'newProject'; name: string }
+  /** Proyecto nuevo con los vídeos de una carpeta del PC (y su FIT/GPX) o con unos vídeos elegidos. */
+  | { cmd: 'newFrom'; name: string | null; folder?: string; videos?: string[] }
   | { cmd: 'openProject'; path: string }
   | { cmd: 'rename'; name: string }
   | { cmd: 'addClips'; paths: string[]; toTimeline?: boolean }

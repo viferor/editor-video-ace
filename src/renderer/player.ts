@@ -8,9 +8,13 @@ export class TimelinePlayer {
   private loadedIdx = -1;
   private seeking: Promise<void> | null = null;
   onUpdate: () => void = () => {};
+  private dead = false;
+  /** Deja de actualizarse (al cerrar una ventana que tenía su propio reproductor). */
+  destroy() { this.dead = true; this.pause(); }
 
   constructor(public video: HTMLVideoElement) {
     const tick = () => {
+      if (this.dead) return;
       if (this.playing && this.loadedIdx >= 0 && !this.video.seeking && !this.seeking) {
         const loc = store.locate(this.T);
         const seg = store.timeline[this.loadedIdx];

@@ -1,6 +1,7 @@
 // Enlace con la app de la tablet (lado del PC): comparte el estado del proyecto y aplica los cambios que llegan.
 import QRCode from 'qrcode';
-import { store } from './store';
+import { store, recentProjects } from './store';
+import { buildProject, folderProjectName, mediaFor } from './projectDialog';
 import { exportProject, exportStatus } from './exportDialog';
 import type { FileOffer, TabletCommand, TabletEdits, TabletExportOptions, TabletInfo, TabletState } from './types';
 import { $, basename, fmtTime, h, toast } from './util';
@@ -15,6 +16,13 @@ export function offerToTablet(f: FileOffer) {
   schedulePush(30);
 }
 let pushTimer: number | null = null;
+/** Recientes que existen (se comprueba aparte porque mirar el disco es asíncrono). */
+let recents: string[] = [];
+async function refreshRecents() {
+  const out: string[] = [];
+  for (const p of recentProjects()) if (await window.api.exists(p)) out.push(p);
+  if (out.join('|') !== recents.join('|')) { recents = out; schedulePush(30); }
+}
 
 export function tabletSnapshot(): TabletState {
   return {
@@ -36,7 +44,8 @@ export function tabletSnapshot(): TabletState {
     busy,
     syncLocked: store.syncLocked,
     mapSynced: store.mapSynced,
-    offers
+    offers,
+    recents
   };
 }
 
@@ -137,6 +146,27 @@ async function runCommand(c: TabletCommand): Promise<unknown> {
         toast(`📱 Proyecto nuevo desde la tablet: ${basename(p)}`, 'ok', 4000);
         return { path: p };
       }
+      case 'newFrom': {
+        setBusy(c.folder ? 'Buscando los vídeos de la carpeta…' : 'Abriendo los vídeos…');
+        const m = await mediaFor({ folder: c.folder, videos: c.videos });
+        if (c.folder && !m.videos.length) throw new Error(`No hay vídeos MP4/MOV en «${basename(c.folder)}» ni en sus subcarpetas`);
+        await keepCurrent();
+        setBusy(`Abriendo ${m.videos.length} vídeo${m.videos.length === 1 ? '' : 's'}…`);
+        const p = await buildProject({ name: c.name || (c.folder ? folderProjectName(c.folder) : null), videos: m.videos });
+        let activity: string | null = null;
+        if (m.activities.length === 1) {
+          setBusy('Leyendo la actividad…');
+          activity = m.activities[0];
+          try {
+            await store.loadTelemetry(activity);
+            if (store.clips.length) store.autoSync(true);
+            store.setSyncLocked(false);
+          } catch { activity = null; }
+        }
+        toast(`📱 Proyecto nuevo desde la tablet: ${basename(p)} (${store.clips.length} vídeos${activity ? ' · ' + basename(activity) : ''})`, 'ok', 5000);
+        // con varias actividades, la tablet pregunta cuál
+        return { path: p, clips: store.clips.length, activity, activities: activity ? [] : m.activities };
+      }
       case 'openProject': {
         setBusy('Abriendo el proyecto…');
         if (store.projectPath && store.projectPath.toLowerCase() === c.path.toLowerCase()) return { path: c.path };
@@ -221,8 +251,10 @@ export function initTabletLink() {
     }
     // el avance de las vistas fluidas, como mucho cada 2 s
     if (what === 'proxy-progress') { if (pushTimer == null) schedulePush(2000); return; }
+    if (what === 'saved' || what === 'all') refreshRecents();
     schedulePush(what === 'export' ? 50 : 250);
   });
+  refreshRecents();
 }
 
 export async function openTabletDialog() {
