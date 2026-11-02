@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#111316" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icono.png" />
+    <title>Editor Ace · tablet</title>
+  </head>
+  <body class="tablet">
+    <div id="app"><div style="padding:24px;font:16px sans-serif;color:#ccc" id="boot">Cargando la app…</div></div>
+    <script>
+      setTimeout(function () {
+        if (window.__tabletStarted) return;
+        var b = document.getElementById('boot');
+        var m = 'La app no ha podido arrancar en este navegador (' + navigator.userAgent.replace(/^.*?(Chrome\/\d+|Firefox\/\d+|Version\/[\d.]+).*$/, '$1') + '). Actualiza Chrome desde Google Play y vuelve a abrir el enlace.';
+        if (b) b.textContent = m;
+        try { var x = new XMLHttpRequest(); x.open('POST', '/api/hello' + location.search); x.setRequestHeader('Content-Type', 'application/json'); x.send(JSON.stringify({ error: 'la app no arrancó: ' + navigator.userAgent.slice(0, 150) })); } catch (e) {}
+      }, 8000);
+    </script>
+    <script type="module" src="./tablet.ts"></script>
+  </body>
+</html>

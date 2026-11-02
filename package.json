@@ -1,0 +1,92 @@
+{
+  "name": "editor-video-ace",
+  "productName": "Editor Video Ace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Editor de vídeo para Insta360 Ace Pro 2 con telemetría FIT/GPX",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -n vite,app \"vite\" \"wait-on tcp:127.0.0.1:5173 && electron . --dev\"",
+    "build": "tsc --noEmit && vite build",
+    "start": "vite build && electron .",
+    "dist": "vite build && electron-builder --win --publish never"
+  },
+  "dependencies": {
+    "@garmin/fitsdk": "^21.218.0",
+    "@types/qrcode": "^1.5.6",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "leaflet": "^1.9.4",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.22",
+    "concurrently": "^9.2.0",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.0",
+    "wait-on": "^9.0.0"
+  },
+  "build": {
+    "appId": "local.editorvideo.ace",
+    "productName": "Editor Video Ace",
+    "files": [
+      "dist/**",
+      "electron/**",
+      "build/icon.*",
+      "package.json",
+      "!node_modules/ffprobe-static/bin/**"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "extraResources": [
+        {
+          "from": "node_modules/ffprobe-static/bin/win32/x64",
+          "to": "bin",
+          "filter": [
+            "ffprobe.exe"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Editor Video Ace",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "Editor-Video-Ace-Instalador-${version}.exe"
+    },
+    "linux": {
+      "target": "dir",
+      "extraResources": [
+        {
+          "from": "node_modules/ffprobe-static/bin/linux/x64",
+          "to": "bin",
+          "filter": [
+            "ffprobe"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,2 +1,13 @@
-# Auto detect text files and perform LF normalization
+# Detecta los archivos de texto y los guarda con LF en el repositorio
 * text=auto
+
+# Los scripts de Windows siempre con CRLF (si no, pueden fallar al ejecutarse)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.vbs text eol=crlf
+*.ps1 text eol=crlf
+
+# Binarios: no tocar
+*.png binary
+*.ico binary
+*.exe binary

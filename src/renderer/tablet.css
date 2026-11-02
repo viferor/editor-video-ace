@@ -1,0 +1,104 @@
+/* App de la tablet: botones grandes y todo a pantalla completa */
+body.tablet { font-size: 15px; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; user-select: none; }
+body.tablet #app { display: grid; grid-template-rows: 56px 1fr auto; height: 100dvh; }
+body.tablet button { padding: 9px 14px; min-height: 42px; }
+.t-top { display: flex; align-items: center; gap: 8px; padding: 0 10px; background: var(--bg2); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.t-top .brand { white-space: nowrap; }
+.t-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 26vw; }
+.t-conn { color: var(--err); font-size: 18px; }
+.t-conn.ok { color: var(--ok); }
+.t-main { display: flex; flex-direction: column; min-height: 0; padding: 8px 10px 0; }
+.t-transport { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.t-transport input[type=range] { height: 34px; }
+.t-btn { min-width: 46px; }
+.t-btn.big { min-width: 64px; font-size: 18px; }
+.t-tl { background: var(--bg2); border-top: 1px solid var(--line); padding: 6px 10px 10px; }
+.t-tools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.t-scroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+.t-inner { position: relative; height: 96px; }
+.t-track { display: flex; height: 64px; position: relative; }
+.t-seg { flex: none; height: 100%; margin-right: 2px; border-radius: 8px; background: color-mix(in srgb, var(--c) 35%, var(--bg3)); border: 2px solid color-mix(in srgb, var(--c) 70%, transparent); display: flex; align-items: flex-end; padding: 4px 6px; font-size: 12px; color: var(--muted); overflow: hidden; }
+.t-seg.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+.t-music { position: relative; height: 24px; margin-top: 6px; }
+.t-song { position: absolute; top: 0; bottom: 0; background: rgba(155, 123, 255, .22); border: 1px solid rgba(155, 123, 255, .6); border-radius: 6px; font-size: 11px; padding: 3px 8px; white-space: nowrap; overflow: hidden; color: #d6ccff; }
+.t-head { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--accent); pointer-events: none; z-index: 5; }
+.t-info { font-size: 12px; margin-top: 4px; }
+.big-check { font-size: 16px; margin: 6px 0 10px; }
+.big-check input { width: 22px; height: 22px; }
+.tpl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tpl-btn { padding: 18px 10px !important; font-size: 15px; }
+body.tablet .modal { max-height: 92dvh; overflow-y: auto; }
+body.tablet input[type=checkbox] { width: 20px; height: 20px; }
+body.tablet select { padding: 9px 10px; font-size: 15px; }
+@media (max-width: 900px) { .t-top .brand { display: none; } }
+
+.t-info { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; height: 18px; }
+.t-tools { flex-wrap: nowrap; overflow-x: auto; }
+body.tablet #app { grid-template-columns: minmax(0, 1fr); }
+body.tablet #app > * { min-width: 0; }
+.t-scroll { width: 100%; }
+
+/* proyecto, clips y explorador de archivos */
+.t-title { background: none; border: none; color: var(--text); padding: 6px 8px !important; min-height: 0 !important; }
+.t-busy { font-size: 12.5px; color: #ffd43b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 30vw; }
+.pm-card { background: var(--bg3); border-radius: 10px; padding: 10px 12px; margin: 6px 0 10px; line-height: 1.5; }
+.pm-name { font-size: 18px; font-weight: 600; }
+.pm-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.modal h3 { font-size: 15px; margin: 14px 0 4px; }
+.cl-list, .fp-list { max-height: 52dvh; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; }
+.cl-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.cl-dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.cl-name { flex: 1; min-width: 0; }
+.cl-name > div:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
+.fp-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-size: 12.5px; background: var(--bg3); padding: 10px; border-radius: 8px; }
+.fp-row { display: flex; align-items: center; gap: 10px; padding: 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.fp-row:active { background: var(--bg3); }
+.fp-row.on { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.fp-ico { width: 24px; text-align: center; font-size: 18px; }
+.fp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-meta { font-size: 12px; white-space: nowrap; }
+.fp-empty { padding: 16px; }
+.fp-upl { margin: 10px 0; display: grid; gap: 6px; }
+.t-upload-btn { display: inline-flex; align-items: center; padding: 9px 14px; min-height: 42px; border-radius: 8px; background: var(--bg3); border: 1px solid var(--line); cursor: pointer; }
+.modal-back.busy .modal-actions button, .modal-back.busy .t-upload-btn, .modal-back.busy .fp-list { pointer-events: none; opacity: .5; }
+#fp-foot { margin-top: 8px; }
+
+/* sincronizar en la tablet */
+.t-syncpanel { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; grid-template-rows: auto 1fr; }
+.t-syncpanel[hidden] { display: none; }
+.t-sync-top { display: flex; align-items: center; gap: 12px; padding: 6px 10px; background: var(--bg2); border-bottom: 1px solid var(--line); }
+.t-sync-top .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t-sync-body { min-height: 0; }
+.t-sync-body .sync { grid-template-columns: minmax(360px, 40%) 1fr; }
+.t-sync-body .offset-row button { min-width: 64px; }
+.t-sync-body .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; font-size: 22px; }
+@media (orientation: portrait) {
+  .t-sync-body .sync { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 42dvh; }
+  .t-sync-body .sync-left { border-right: none; border-bottom: 1px solid var(--line); }
+  .t-sync-top .small { display: none; }
+}
+
+.t-upload-btn.disabled { opacity: .45; }
+.t-offers { position: fixed; right: 12px; bottom: 12px; z-index: 40; display: grid; gap: 8px; max-width: min(460px, 90vw); }
+.t-offer { background: var(--bg2); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+.t-offer .grow { min-width: 0; }
+.t-offer .grow div:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* barra superior compacta: que quepa todo en una tablet apaisada */
+.t-top { gap: 5px; }
+.t-top > button { padding: 8px 10px !important; font-size: 14px; white-space: nowrap; flex: none; }
+.t-top .brand b + span { display: none; }
+.t-title { max-width: 18vw; flex: 0 1 auto; min-width: 40px; }
+@media (max-width: 1200px) { .t-top .brand { display: none; } }
+.t-offers { top: 64px; bottom: auto; }
+
+/* pantalla completa */
+.t-top > .t-fs { font-size: 18px; padding: 6px 12px !important; }
+#t-box:fullscreen { background: #000; width: 100vw; height: 100vh; max-height: none; border-radius: 0; }
+#t-box:-webkit-full-screen { background: #000; width: 100vw; height: 100vh; }
+#t-box:fullscreen video { width: 100%; height: 100%; object-fit: contain; }
+.t-vfs-bar { display: none; position: absolute; left: 0; right: 0; bottom: 18px; justify-content: center; gap: 12px; z-index: 6; opacity: .35; transition: opacity .2s; }
+.t-vfs-bar:hover, .t-vfs-bar:active { opacity: 1; }
+body.fs-video .t-vfs-bar { display: flex; }
+.t-vfs-bar .t-btn { background: rgba(0,0,0,.55); border-color: rgba(255,255,255,.3); }
